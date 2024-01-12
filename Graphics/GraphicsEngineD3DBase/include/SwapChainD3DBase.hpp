@@ -190,6 +190,10 @@ protected:
         // mode (or monitor resolution) will be changed to match the dimensions of the application window.
         swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
+        // legacy scaling mode hack (for windows 11 compatibility)
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+
 
         CComPtr<IDXGIFactory2> pDXGIFactory;
 
@@ -199,7 +203,9 @@ protected:
         // DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT enables querying a waitable object that can be
         // used to synchronize presentation with CPU timeline.
         // The flag is not supported in D3D11 fullscreen mode.
-        if (!(m_FSDesc.Fullscreen && m_pRenderDevice->GetDeviceInfo().Type == RENDER_DEVICE_TYPE_D3D11))
+        //if (!(m_FSDesc.Fullscreen && m_pRenderDevice->GetDeviceInfo().Type == RENDER_DEVICE_TYPE_D3D11))
+        // DISABLED TO FIX RENDERING ON W11
+        if (false)
         {
             // We do not need pDXGIFactory3 itself, however DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT flag
             // is only supported starting with Windows 8.1, and so is IDXGIFactory3 interface. We query this
