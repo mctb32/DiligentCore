@@ -192,7 +192,7 @@ protected:
 
         // legacy scaling mode hack (for windows 11 compatibility)
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+        swapChainDesc.Scaling    = DXGI_SCALING_STRETCH;
 
 
         CComPtr<IDXGIFactory2> pDXGIFactory;
