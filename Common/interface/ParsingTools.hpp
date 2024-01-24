@@ -31,6 +31,7 @@
 
 #include <cstring>
 #include <sstream>
+#include <limits>
 
 #include "../../Primitives/interface/BasicTypes.h"
 #include "../../Primitives/interface/FlagEnum.h"
@@ -75,9 +76,9 @@ inline bool IsDigit(Char Symbol) noexcept
 
 /// Skips all characters until the end of the line.
 
-/// \param[inout] Pos          - starting position.
-/// \param[in]    End          - end of the input string.
-/// \param[in]    GoToNextLine - whether to go to the next line.
+/// \param[in] Start        - starting position.
+/// \param[in] End          - end of the input string.
+/// \param[in] GoToNextLine - whether to go to the next line.
 ///
 /// \return       If GoToNextLine is true, the position following the
 ///               new line character at the end of the string.
@@ -124,9 +125,9 @@ DEFINE_FLAG_ENUM_OPERATORS(SKIP_COMMENT_FLAGS)
 
 /// Skips single-line and multi-line comments starting from the given position.
 
-/// \param[inout] Start - starting position.
-/// \param[in]    End   - end of the input string.
-/// \param[in]    Flags - flags controlling what kind of comments to skip.
+/// \param[in] Start - starting position.
+/// \param[in] End   - end of the input string.
+/// \param[in] Flags - flags controlling what kind of comments to skip.
 ///
 /// \return     if the comment is found, the position immediately following
 ///             the end of the comment; starting position otherwise.
@@ -211,9 +212,9 @@ InteratorType SkipComment(const InteratorType& Start, const InteratorType& End, 
 
 /// Skips all delimiters starting from the given position.
 
-/// \param[inout] Pos        - starting position.
-/// \param[in]    End        - end of the input string.
-/// \param[in]    Delimiters - optional string containing custom delimiters.
+/// \param[in] Start      - starting position.
+/// \param[in] End        - end of the input string.
+/// \param[in] Delimiters - optional string containing custom delimiters.
 ///
 /// \return       position of the first non-delimiter character.
 template <typename InteratorType>
@@ -236,10 +237,10 @@ InteratorType SkipDelimiters(const InteratorType& Start, const InteratorType& En
 
 /// Skips all comments and all delimiters starting from the given position.
 
-/// \param[inout] Pos          - starting position.
-/// \param[in]    End          - end of the input string.
-/// \param[in]    Delimiters   - optional string containing custom delimiters.
-/// \param[in]    CommentFlags - optional flags controlling what kind of comments to skip.
+/// \param[in] Start        - starting position.
+/// \param[in] End          - end of the input string.
+/// \param[in] Delimiters   - optional string containing custom delimiters.
+/// \param[in] CommentFlags - optional flags controlling what kind of comments to skip.
 ///
 /// \return true  position of the first non-comment non-delimiter character.
 ///
@@ -270,8 +271,8 @@ IteratorType SkipDelimitersAndComments(const IteratorType& Start,
 
 /// Skips one identifier starting from the given position.
 
-/// \param[inout] Pos - starting position.
-/// \param[in]    End - end of the input string.
+/// \param[in] Start - starting position.
+/// \param[in] End   - end of the input string.
 ///
 /// \return     position immediately following the last character of identifier.
 template <typename IteratorType>
@@ -295,8 +296,8 @@ IteratorType SkipIdentifier(const IteratorType& Start, const IteratorType& End) 
 
 /// Skips a floating point number starting from the given position.
 
-/// \param[inout] Pos - starting position.
-/// \param[in]    End - end of the input string.
+/// \param[in] Start - starting position.
+/// \param[in] End   - end of the input string.
 ///
 /// \return     position immediately following the last character of the number.
 template <typename IteratorType>
@@ -385,6 +386,38 @@ IteratorType SkipFloatNumber(const IteratorType& Start, const IteratorType& End)
     return Pos;
 }
 
+/// Parses an integer starting from the given position.
+///
+/// \param[in]  Start - starting position.
+/// \param[in]  End   - end of the input string
+/// \param[out] Value - parsed integer value.
+/// \return     position immediately following the last character of the number.
+template <typename IteratorType, typename ValueType>
+IteratorType ParseInteger(const IteratorType& Start, const IteratorType& End, ValueType& Value) noexcept
+{
+    auto Pos = Start;
+    if (Pos == End)
+        return Pos;
+
+    const bool IsNegative = *Pos == '-';
+    if (*Pos == '+' || *Pos == '-')
+        ++Pos;
+
+    if (Pos == End || !IsNum(*Pos))
+        return Start;
+
+    Value = 0;
+    while (Pos != End && IsNum(*Pos))
+    {
+        Value = Value * 10 + (*Pos - '0');
+        ++Pos;
+    }
+
+    if (IsNegative)
+        Value = -Value;
+
+    return Pos;
+}
 
 /// Splits string into chunks separated by comments and delimiters.
 ///
@@ -1121,6 +1154,75 @@ inline std::string RefinePreprocessorDirective(const char* Str, size_t Len = 0) 
         Len = strlen(Str);
 
     return RefinePreprocessorDirective(Str, Str + Len);
+}
+
+static constexpr int InvalidArrayIndex = std::numeric_limits<int>::min();
+
+/// Returns the array index if the given variable name is an indexed array element.
+///
+/// \param [in]  Start   - starting position.
+/// \param [in]  End     - end of the input string.
+/// \param [out] NameEnd - ending position of the variable name.
+///
+/// \return     - Array index if the given variable name is an array element.
+///             - -1 if the given variable name is a valid identifier and is not an array element.
+///             - INT_MIN if the array index is invalid.
+template <typename InteratorType>
+inline int GetArrayIndex(const InteratorType& Start, const InteratorType& End, InteratorType& NameEnd)
+{
+    NameEnd = SkipIdentifier(Start, End);
+    // Empty name is not a valid identifier
+    if (NameEnd == Start)
+    {
+        //
+        //  ^
+        return InvalidArrayIndex;
+    }
+
+    if (NameEnd == End)
+    {
+        // MyArray
+        //        ^
+        return -1;
+    }
+    // MyArray [ 16 ]
+    //        ^
+
+    auto Pos = SkipDelimiters(NameEnd, End, " \t");
+    // MyArray [ 16 ]
+    //         ^
+    if (Pos == End || *Pos != '[')
+        return InvalidArrayIndex;
+
+    Pos = SkipDelimiters(Pos + 1, End, " \t");
+    // MyArray [ 16 ]
+    //           ^
+    if (Pos == End)
+        return InvalidArrayIndex;
+
+    int Index = InvalidArrayIndex;
+    Pos       = ParseInteger(Pos, End, Index);
+    // MyArray [ 16 ]
+    //             ^
+
+    Pos = SkipDelimiters(Pos, End, " \t");
+    // MyArray [ 16 ]
+    //              ^
+    return (Pos != End && *Pos == ']') ? Index : InvalidArrayIndex;
+}
+
+template <typename InteratorType>
+inline int GetArrayIndex(const InteratorType& Start, const InteratorType& End, std::string& NameWithoutBrackets)
+{
+    InteratorType NameEnd = End;
+    const auto    Index   = GetArrayIndex(Start, End, NameEnd);
+    NameWithoutBrackets.assign(Start, NameEnd);
+    return Index;
+}
+
+inline int GetArrayIndex(const std::string& Var, std::string& NameWithoutBrackets)
+{
+    return GetArrayIndex(Var.begin(), Var.end(), NameWithoutBrackets);
 }
 
 } // namespace Parsing
