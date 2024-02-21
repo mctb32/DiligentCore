@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@
 #include "../../GraphicsEngine/interface/RenderDevice.h"
 #include "../../GraphicsEngine/interface/DeviceContext.h"
 #include "../../GraphicsEngine/interface/Buffer.h"
+#include "../../../Common/interface/StringTools.h"
 
 namespace Diligent
 {
@@ -103,6 +104,16 @@ struct VertexPoolUsageStats
 
     /// The number of allocations.
     Uint32 AllocationCount = 0;
+
+    VertexPoolUsageStats& operator+=(const VertexPoolUsageStats& RHS)
+    {
+        TotalVertexCount += RHS.TotalVertexCount;
+        AllocatedVertexCount += RHS.AllocatedVertexCount;
+        CommittedMemorySize += RHS.CommittedMemorySize;
+        UsedMemorySize += RHS.UsedMemorySize;
+        AllocationCount += RHS.AllocationCount;
+        return *this;
+    }
 };
 
 
@@ -171,6 +182,27 @@ struct VertexPoolDesc
 
     /// The number of vertices in the pool.
     Uint32 VertexCount DEFAULT_INITIALIZER(0);
+
+    bool operator==(const VertexPoolDesc& RHS) const
+    {
+        if (!SafeStrEqual(Name, RHS.Name) ||
+            NumElements != RHS.NumElements ||
+            VertexCount != RHS.VertexCount)
+            return false;
+
+        for (Uint32 i = 0; i < NumElements; ++i)
+        {
+            if (pElements[i] != RHS.pElements[i])
+                return false;
+        }
+
+        return true;
+    }
+
+    bool operator!=(const VertexPoolDesc& RHS) const
+    {
+        return !(*this == RHS);
+    }
 };
 
 /// Vertex pool interface.
@@ -243,6 +275,10 @@ struct VertexPoolCreateInfo
     /// when more space is needed.
     Uint32 ExtraVertexCount = 0;
 
+    /// The maximum number of vertices that can be stored in the pool.
+    /// If zero, the number of vertices is unlimited.
+    Uint32 MaxVertexCount = 0;
+
     /// Whether to disable debug validation of the internal pool structure.
 
     /// \remarks    By default, internal pool structure is validated in debug
@@ -251,6 +287,20 @@ struct VertexPoolCreateInfo
     ///             to true, the validation is disabled.
     ///             The flag is ignored in release builds as the validation is always disabled.
     bool DisableDebugValidation = false;
+
+
+    bool operator==(const VertexPoolCreateInfo& RHS) const
+    {
+        return Desc == RHS.Desc &&
+            ExtraVertexCount == RHS.ExtraVertexCount &&
+            MaxVertexCount == RHS.MaxVertexCount &&
+            DisableDebugValidation == RHS.DisableDebugValidation;
+    }
+
+    bool operator!=(const VertexPoolCreateInfo& RHS) const
+    {
+        return !(*this == RHS);
+    }
 };
 
 /// Creates a new vertex pool.

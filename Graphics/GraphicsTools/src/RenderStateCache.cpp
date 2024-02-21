@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -506,7 +506,8 @@ RenderStateCacheImpl::RenderStateCacheImpl(IReferenceCounters*               pRe
 
         case RENDER_DEVICE_TYPE_GL:
         case RENDER_DEVICE_TYPE_GLES:
-            // Nothing to do
+            // Do not validate shaders as compiling them is time-consuming
+            SerializationDeviceCI.GL.ValidateShaders = false;
             break;
 
         case RENDER_DEVICE_TYPE_VULKAN:
@@ -876,7 +877,7 @@ protected:
             Uint64 Size = 0;
             pShader->GetBytecode(&ShaderCI.ByteCode, Size);
             ShaderCI.ByteCodeSize = static_cast<size_t>(Size);
-            if (DeviceType == RENDER_DEVICE_TYPE_GL)
+            if (DeviceType == RENDER_DEVICE_TYPE_GL || DeviceType == RENDER_DEVICE_TYPE_GLES)
             {
                 ShaderCI.Source         = static_cast<const char*>(ShaderCI.ByteCode);
                 ShaderCI.ByteCode       = nullptr;

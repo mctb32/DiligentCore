@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -173,6 +173,17 @@ public:
         return m_Version.load();
     }
 
+
+    /// Returns the logical virtual size of the sparse buffer.
+    ///
+    /// \note   The actual size of the sparse buffer may be larger
+    ///         than the logical size due to alignment requirements.
+    ///         Use GetBuffer()->GetDesc().Size to get the actual size.
+    Uint64 GetVirtualSize() const
+    {
+        return m_VirtualSize;
+    }
+
 private:
     void InitBuffer(IRenderDevice* pDevice);
     void CreateSparseBuffer(IRenderDevice* pDevice);
@@ -193,7 +204,8 @@ private:
     RefCntAutoPtr<IDeviceMemory> m_pMemory;
 
     Uint64 m_PendingSize = 0;
-    Uint64 m_VirtualSize = 0;
+
+    const Uint64 m_VirtualSize;
 
     Uint32 m_MemoryPageSize = 0;
 

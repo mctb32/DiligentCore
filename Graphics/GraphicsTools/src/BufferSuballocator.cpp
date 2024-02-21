@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -128,38 +128,45 @@ public:
     BufferSuballocatorImpl(IReferenceCounters*                 pRefCounters,
                            IRenderDevice*                      pDevice,
                            const BufferSuballocatorCreateInfo& CreateInfo) :
-        // clang-format off
         TBase{pRefCounters},
-        m_Mgr
-        {
-            VariableSizeAllocationsManager::CreateInfo
-            {
+        m_MaxSize{
+            [](Uint64 Size, Uint64 MaxSize) {
+                if (MaxSize == 0)
+                    MaxSize = Size;
+
+                if (MaxSize < Size)
+                {
+                    LOG_WARNING_MESSAGE("MaxSize (", MaxSize, ") is less than the initial buffer size (", Size, ").");
+                    MaxSize = Size;
+                }
+
+                return MaxSize;
+            }(CreateInfo.Desc.Size, CreateInfo.MaxSize)},
+        m_ExpansionSize{CreateInfo.ExpansionSize},
+        m_Mgr{
+            VariableSizeAllocationsManager::CreateInfo{
                 DefaultRawMemoryAllocator::GetAllocator(),
                 StaticCast<size_t>(CreateInfo.Desc.Size),
-                CreateInfo.DisableDebugValidation
-            }
+                CreateInfo.DisableDebugValidation,
+            },
         },
         m_MgrSize{m_Mgr.GetMaxSize()},
-        m_Buffer
-        {
+        m_Buffer{
             pDevice,
-            DynamicBufferCreateInfo
-            {
+            DynamicBufferCreateInfo{
                 CreateInfo.Desc,
                 CreateInfo.ExpansionSize != 0 ? CreateInfo.ExpansionSize : static_cast<Uint32>(CreateInfo.Desc.Size), // MemoryPageSize
-                CreateInfo.VirtualSize
-            }
+                m_MaxSize,
+            },
         },
         m_BufferSize{m_Buffer.GetDesc().Size},
-        m_ExpansionSize{CreateInfo.ExpansionSize},
-        m_SuballocationsAllocator
-        {
+        m_SuballocationsAllocator{
             DefaultRawMemoryAllocator::GetAllocator(),
             sizeof(BufferSuballocationImpl),
             1024u / Uint32{sizeof(BufferSuballocationImpl)} // Use 1 Kb pages.
         }
-    // clang-format on
-    {}
+    {
+    }
 
     ~BufferSuballocatorImpl()
     {
@@ -229,11 +236,14 @@ public:
 
             Subregion = m_Mgr.Allocate(Size, Alignment);
 
-            while (!Subregion.IsValid())
+            while (!Subregion.IsValid() && (m_MaxSize == 0 || m_MaxSize > m_Mgr.GetMaxSize()))
             {
-                auto ExtraSize = m_ExpansionSize != 0 ?
+                size_t ExtraSize = m_ExpansionSize != 0 ?
                     std::max(m_ExpansionSize, AlignUp(Size, Alignment)) :
                     m_Mgr.GetMaxSize();
+
+                if (m_MaxSize != 0)
+                    ExtraSize = std::min(ExtraSize, StaticCast<size_t>(m_MaxSize) - m_Mgr.GetMaxSize());
 
                 m_Mgr.Extend(ExtraSize);
                 m_MgrSize.store(m_Mgr.GetMaxSize());
@@ -244,20 +254,23 @@ public:
             UpdateUsageStats();
         }
 
-        // clang-format off
-        BufferSuballocationImpl* pSuballocation{
-            NEW_RC_OBJ(m_SuballocationsAllocator, "BufferSuballocationImpl instance", BufferSuballocationImpl)
-            (
-                this,
-                AlignUp(static_cast<Uint32>(Subregion.UnalignedOffset), Alignment),
-                Size,
-                std::move(Subregion)
-            )
-        };
-        // clang-format on
+        if (Subregion.IsValid())
+        {
+            // clang-format off
+            BufferSuballocationImpl* pSuballocation{
+                NEW_RC_OBJ(m_SuballocationsAllocator, "BufferSuballocationImpl instance", BufferSuballocationImpl)
+                (
+                    this,
+                    AlignUp(static_cast<Uint32>(Subregion.UnalignedOffset), Alignment),
+                    Size,
+                    std::move(Subregion)
+                )
+            };
+            // clang-format on
 
-        pSuballocation->QueryInterface(IID_BufferSuballocation, reinterpret_cast<IObject**>(ppSuballocation));
-        m_AllocationCount.fetch_add(1);
+            pSuballocation->QueryInterface(IID_BufferSuballocation, reinterpret_cast<IObject**>(ppSuballocation));
+            m_AllocationCount.fetch_add(1);
+        }
     }
 
     void Free(VariableSizeAllocationsManager::Allocation&& Subregion)
@@ -290,6 +303,9 @@ private:
     }
 
 private:
+    const Uint64 m_MaxSize;
+    const Uint32 m_ExpansionSize;
+
     std::mutex                     m_MgrMtx;
     VariableSizeAllocationsManager m_Mgr;
 
@@ -297,8 +313,6 @@ private:
 
     DynamicBuffer       m_Buffer;
     std::atomic<Uint64> m_BufferSize{0};
-
-    const Uint32 m_ExpansionSize;
 
     std::atomic<Int32>  m_AllocationCount{0};
     std::atomic<Uint64> m_UsedSize{0};

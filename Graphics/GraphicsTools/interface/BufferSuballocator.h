@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -102,6 +102,15 @@ struct BufferSuballocatorUsageStats
 
     /// The current number of allocations.
     Uint32 AllocationCount = 0;
+
+    BufferSuballocatorUsageStats& operator+=(const BufferSuballocatorUsageStats& rhs)
+    {
+        CommittedSize += rhs.CommittedSize;
+        UsedSize += rhs.UsedSize;
+        MaxFreeChunkSize = std::max(MaxFreeChunkSize, rhs.MaxFreeChunkSize);
+        AllocationCount += rhs.AllocationCount;
+        return *this;
+    }
 };
 
 /// Buffer suballocator.
@@ -162,8 +171,11 @@ struct BufferSuballocatorCreateInfo
     /// more space is needed.
     Uint32 ExpansionSize = 0;
 
-    /// If Desc.Usage == USAGE_SPARSE, the virtual buffer size; ignored otherwise.
-    Uint64 VirtualSize = 0;
+    /// The maximum buffer size, in bytes.
+    /// If Desc.Usage == USAGE_SPARSE, also the buffer virtual size.
+    ///
+    /// \remarks    If MaxSize is zero, the buffer will not be expanded beyond the initial size.
+    Uint64 MaxSize = 0;
 
     /// Whether to disable debug validation of the internal buffer structure.
 
