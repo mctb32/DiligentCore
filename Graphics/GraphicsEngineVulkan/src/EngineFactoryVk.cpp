@@ -1144,6 +1144,23 @@ void EngineFactoryVkImpl::CreateDeviceAndContextsVk(const EngineVkCreateInfo& En
                 }
             }
 
+            if (EnabledFeatures.NativeMultiDraw != DEVICE_FEATURE_STATE_DISABLED)
+            {
+                VERIFY_EXPR(PhysicalDevice->IsExtensionSupported(VK_EXT_MULTI_DRAW_EXTENSION_NAME));
+                DeviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
+
+                EnabledExtFeats.MultiDraw = DeviceExtFeatures.MultiDraw;
+
+                *NextExt = &EnabledExtFeats.MultiDraw;
+                NextExt  = &EnabledExtFeats.MultiDraw.pNext;
+
+
+                EnabledExtFeats.ShaderDrawParameters = DeviceExtFeatures.ShaderDrawParameters;
+
+                *NextExt = &EnabledExtFeats.ShaderDrawParameters;
+                NextExt  = &EnabledExtFeats.ShaderDrawParameters.pNext;
+            }
+
             // Append user-defined features
             *NextExt = EngineCI.pDeviceExtensionFeatures;
         }
@@ -1153,7 +1170,7 @@ void EngineFactoryVkImpl::CreateDeviceAndContextsVk(const EngineVkCreateInfo& En
                 LOG_ERROR_MESSAGE("Can not enable extended device features when VK_KHR_get_physical_device_properties2 extension is not supported by device");
         }
 
-        ASSERT_SIZEOF(Diligent::DeviceFeatures, 42, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
+        ASSERT_SIZEOF(Diligent::DeviceFeatures, 43, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
 
         for (Uint32 i = 0; i < EngineCI.DeviceExtensionCount; ++i)
         {

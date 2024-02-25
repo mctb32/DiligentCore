@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2024 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -836,6 +836,49 @@ void DeviceContextVkImpl::Draw(const DrawAttribs& Attribs)
     }
 }
 
+void DeviceContextVkImpl::MultiDraw(const MultiDrawAttribs& Attribs)
+{
+    TDeviceContextBase::MultiDraw(Attribs, 0);
+
+    PrepareForDraw(Attribs.Flags);
+
+    if (Attribs.NumInstances == 0)
+        return;
+
+    if (m_NativeMultiDrawSupported)
+    {
+        m_ScratchSpace.resize(sizeof(VkMultiDrawInfoEXT) * Attribs.DrawCount);
+        VkMultiDrawInfoEXT* pDrawInfo = reinterpret_cast<VkMultiDrawInfoEXT*>(m_ScratchSpace.data());
+
+        Uint32 DrawCount = 0;
+        for (Uint32 i = 0; i < Attribs.DrawCount; ++i)
+        {
+            const auto& Item = Attribs.pDrawItems[i];
+            if (Item.NumVertices > 0)
+            {
+                pDrawInfo[i] = {Item.StartVertexLocation, Item.NumVertices};
+                ++DrawCount;
+            }
+        }
+        if (DrawCount > 0)
+        {
+            m_CommandBuffer.MultiDraw(DrawCount, pDrawInfo, Attribs.NumInstances, Attribs.FirstInstanceLocation);
+        }
+    }
+    else
+    {
+        for (Uint32 i = 0; i < Attribs.DrawCount; ++i)
+        {
+            const auto& Item = Attribs.pDrawItems[i];
+            if (Item.NumVertices > 0)
+            {
+                m_CommandBuffer.Draw(Item.NumVertices, Attribs.NumInstances, Item.StartVertexLocation, Attribs.FirstInstanceLocation);
+                ++m_State.NumCommands;
+            }
+        }
+    }
+}
+
 void DeviceContextVkImpl::DrawIndexed(const DrawIndexedAttribs& Attribs)
 {
     TDeviceContextBase::DrawIndexed(Attribs, 0);
@@ -846,6 +889,49 @@ void DeviceContextVkImpl::DrawIndexed(const DrawIndexedAttribs& Attribs)
     {
         m_CommandBuffer.DrawIndexed(Attribs.NumIndices, Attribs.NumInstances, Attribs.FirstIndexLocation, Attribs.BaseVertex, Attribs.FirstInstanceLocation);
         ++m_State.NumCommands;
+    }
+}
+
+void DeviceContextVkImpl::MultiDrawIndexed(const MultiDrawIndexedAttribs& Attribs)
+{
+    TDeviceContextBase::MultiDrawIndexed(Attribs, 0);
+
+    PrepareForIndexedDraw(Attribs.Flags, Attribs.IndexType);
+
+    if (Attribs.NumInstances == 0)
+        return;
+
+    if (m_NativeMultiDrawSupported)
+    {
+        m_ScratchSpace.resize(sizeof(VkMultiDrawIndexedInfoEXT) * Attribs.DrawCount);
+        VkMultiDrawIndexedInfoEXT* pDrawInfo = reinterpret_cast<VkMultiDrawIndexedInfoEXT*>(m_ScratchSpace.data());
+
+        Uint32 DrawCount = 0;
+        for (Uint32 i = 0; i < Attribs.DrawCount; ++i)
+        {
+            const auto& Item = Attribs.pDrawItems[i];
+            if (Item.NumIndices > 0)
+            {
+                pDrawInfo[i] = {Item.FirstIndexLocation, Item.NumIndices, static_cast<int32_t>(Item.BaseVertex)};
+                ++DrawCount;
+            }
+        }
+        if (DrawCount > 0)
+        {
+            m_CommandBuffer.MultiDrawIndexed(DrawCount, pDrawInfo, Attribs.NumInstances, Attribs.FirstInstanceLocation);
+        }
+    }
+    else
+    {
+        for (Uint32 i = 0; i < Attribs.DrawCount; ++i)
+        {
+            const auto& Item = Attribs.pDrawItems[i];
+            if (Item.NumIndices > 0)
+            {
+                m_CommandBuffer.DrawIndexed(Item.NumIndices, Attribs.NumInstances, Item.FirstIndexLocation, Item.BaseVertex, Attribs.FirstInstanceLocation);
+                ++m_State.NumCommands;
+            }
+        }
     }
 }
 

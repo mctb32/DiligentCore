@@ -839,6 +839,7 @@ void RenderDeviceGLImpl::InitAdapterInfo()
             ENABLE_FEATURE(UniformBuffer8BitAccess,       CheckExtension("GL_EXT_shader_8bit_storage"));
             ENABLE_FEATURE(TextureComponentSwizzle,       IsGL46OrAbove || CheckExtension("GL_ARB_texture_swizzle"));
             ENABLE_FEATURE(TextureSubresourceViews,       IsGL43OrAbove || CheckExtension("GL_ARB_texture_view"));
+            ENABLE_FEATURE(NativeMultiDraw,               true);
             // clang-format on
 
             TexProps.MaxTexture1DDimension      = MaxTextureSize;
@@ -917,6 +918,7 @@ void RenderDeviceGLImpl::InitAdapterInfo()
             ENABLE_FEATURE(UniformBuffer8BitAccess,   strstr(Extensions, "shader_8bit_storage"));
             ENABLE_FEATURE(TextureComponentSwizzle,   true);
             ENABLE_FEATURE(TextureSubresourceViews,   strstr(Extensions, "texture_view"));
+            ENABLE_FEATURE(NativeMultiDraw,           strstr(Extensions, "multi_draw"));
             // clang-format on
 
             TexProps.MaxTexture1DDimension      = 0; // Not supported in GLES 3.2
@@ -1085,7 +1087,7 @@ void RenderDeviceGLImpl::InitAdapterInfo()
         m_AdapterInfo.Queues[0].TextureCopyGranularity[2] = 1;
     }
 
-    ASSERT_SIZEOF(DeviceFeatures, 42, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
+    ASSERT_SIZEOF(DeviceFeatures, 43, "Did you add a new feature to DeviceFeatures? Please handle its status here.");
 }
 
 void RenderDeviceGLImpl::FlagSupportedTexFormats()

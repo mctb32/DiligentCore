@@ -2029,6 +2029,9 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
                   ExtFeatures.ShadingRate.attachmentFragmentShadingRate != VK_FALSE ||
                   ExtFeatures.FragmentDensityMap.fragmentDensityMap != VK_FALSE));
 
+    INIT_FEATURE(NativeMultiDraw,
+                 ExtFeatures.MultiDraw.multiDraw != VK_FALSE && ExtFeatures.ShaderDrawParameters.shaderDrawParameters != VK_FALSE);
+
 #undef INIT_FEATURE
 
     // Not supported in Vulkan on top of Metal.
@@ -2038,7 +2041,7 @@ DeviceFeatures VkFeaturesToDeviceFeatures(uint32_t                              
     Features.DurationQueries        = DEVICE_FEATURE_STATE_DISABLED;
 #endif
 
-    ASSERT_SIZEOF(DeviceFeatures, 42, "Did you add a new feature to DeviceFeatures? Please handle its status here (if necessary).");
+    ASSERT_SIZEOF(DeviceFeatures, 43, "Did you add a new feature to DeviceFeatures? Please handle its status here (if necessary).");
 
     return Features;
 }
