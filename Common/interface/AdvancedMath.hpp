@@ -231,11 +231,36 @@ struct BoundBox
         return NewBB;
     }
 
+    float3 GetCorner(size_t i) const
+    {
+        return {
+            (i & 0x01u) ? Max.x : Min.x,
+            (i & 0x02u) ? Max.y : Min.y,
+            (i & 0x04u) ? Max.z : Min.z,
+        };
+    }
+
     BoundBox Combine(const BoundBox& Box) const
     {
         return {
             (std::min)(Min, Box.Min),
             (std::max)(Max, Box.Max),
+        };
+    }
+
+    BoundBox Enclose(const float3& Point) const
+    {
+        return {
+            (std::min)(Min, Point),
+            (std::max)(Max, Point),
+        };
+    }
+
+    static const BoundBox Invalid()
+    {
+        return {
+            float3{+FLT_MAX},
+            float3{-FLT_MAX},
         };
     }
 
