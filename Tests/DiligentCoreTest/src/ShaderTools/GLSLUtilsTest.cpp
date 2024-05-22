@@ -1,6 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
- *  Copyright 2015-2019 Egor Yusov
+ *  Copyright 2024 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -25,40 +24,43 @@
  *  of the possibility of such damages.
  */
 
-#pragma once
+#include "GLSLUtils.hpp"
 
-/// \file
-/// Definition of the Diligent::IRenderPassVk interface
+#include "TestingEnvironment.hpp"
+#include "gtest/gtest.h"
 
-#include "../../GraphicsEngine/interface/RenderPass.h"
+using namespace Diligent;
+using namespace Diligent::Testing;
 
-DILIGENT_BEGIN_NAMESPACE(Diligent)
-
-// {3DE6938F-D34D-4135-A6FA-15A89E9525D0}
-static DILIGENT_CONSTEXPR INTERFACE_ID IID_RenderPassVk =
-    {0x3de6938f, 0xd34d, 0x4135, {0xa6, 0xfa, 0x15, 0xa8, 0x9e, 0x95, 0x25, 0xd0}};
-
-#define DILIGENT_INTERFACE_NAME IRenderPassVk
-#include "../../../Primitives/interface/DefineInterfaceHelperMacros.h"
-
-#define IRenderPassVkInclusiveMethods                              \
-    /*IRenderPassInclusiveMethods*/ IDeviceObjectInclusiveMethods; \
-    IRenderPassVkMethods RenderPassVk
-
-/// Exposes Vulkan-specific functionality of a RenderPass object.
-DILIGENT_BEGIN_INTERFACE(IRenderPassVk, IRenderPass)
+namespace
 {
-    /// Returns a Vulkan handle of the internal render pass object.
-    VIRTUAL VkRenderPass METHOD(GetVkRenderPass)(THIS) CONST PURE;
-};
-DILIGENT_END_INTERFACE
 
-#include "../../../Primitives/interface/UndefInterfaceHelperMacros.h"
+TEST(GLSLUtilsTest, GetGLSLExtensions)
+{
+    auto Test = [](const std::string& Source, const std::vector<std::pair<std::string, std::string>>& RefExtensions) {
+        auto Extensions = GetGLSLExtensions(Source.c_str(), Source.length());
+        EXPECT_EQ(Extensions.size(), RefExtensions.size());
 
-#if DILIGENT_C_INTERFACE
+        for (size_t i = 0; i < std::min(Extensions.size(), RefExtensions.size()); ++i)
+        {
+            EXPECT_EQ(Extensions[i].first, RefExtensions[i].first);
+            EXPECT_EQ(Extensions[i].second, RefExtensions[i].second);
+        }
+    };
 
-#    define IRenderPassVk_GetVkRenderPass(This) CALL_IFACE_METHOD(RenderPassVk, GetVkRenderPass, This)
+    Test("", {});
+    Test("#", {});
+    Test("# define", {});
+    Test("# extension", {});
+    Test("# extension ABC", {{"ABC", ""}});
+    Test("# extension : enable", {});
+    Test("# extension ABC : enable", {{"ABC", "enable"}});
 
-#endif
+    Test(R"(
+# extension ABC : enable
+# extension XYZ : require
+)",
+         {{"ABC", "enable"}, {"XYZ", "require"}});
+}
 
-DILIGENT_END_NAMESPACE // namespace Diligent
+} // namespace

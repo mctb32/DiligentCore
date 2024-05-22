@@ -1223,30 +1223,30 @@ void DeviceContextVkImpl::ClearDepthStencil(ITextureView*                  pView
     ++m_State.NumCommands;
 }
 
-VkClearColorValue ClearValueToVkClearValue(const float* RGBA, TEXTURE_FORMAT TexFmt)
+VkClearColorValue ClearValueToVkClearValue(const void* RGBA, TEXTURE_FORMAT TexFmt)
 {
     VkClearColorValue ClearValue;
     const auto&       FmtAttribs = GetTextureFormatAttribs(TexFmt);
     if (FmtAttribs.ComponentType == COMPONENT_TYPE_SINT)
     {
         for (int i = 0; i < 4; ++i)
-            ClearValue.int32[i] = static_cast<int32_t>(RGBA[i]);
+            ClearValue.int32[i] = static_cast<const int32_t*>(RGBA)[i];
     }
     else if (FmtAttribs.ComponentType == COMPONENT_TYPE_UINT)
     {
         for (int i = 0; i < 4; ++i)
-            ClearValue.uint32[i] = static_cast<uint32_t>(RGBA[i]);
+            ClearValue.uint32[i] = static_cast<const uint32_t*>(RGBA)[i];
     }
     else
     {
         for (int i = 0; i < 4; ++i)
-            ClearValue.float32[i] = RGBA[i];
+            ClearValue.float32[i] = static_cast<const float*>(RGBA)[i];
     }
 
     return ClearValue;
 }
 
-void DeviceContextVkImpl::ClearRenderTarget(ITextureView* pView, const float* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
+void DeviceContextVkImpl::ClearRenderTarget(ITextureView* pView, const void* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
 {
     TDeviceContextBase::ClearRenderTarget(pView);
 
@@ -1720,7 +1720,12 @@ void DeviceContextVkImpl::SetViewports(Uint32 NumViewports, const Viewport* pVie
         m_FramebufferSamples = 1;
     }
 
-    CommitViewports();
+    // If no graphics PSO is currently bound, viewports will be committed by
+    // the SetPipelineState() when a graphics PSO is set.
+    if (m_pPipelineState && m_pPipelineState->GetDesc().IsAnyGraphicsPipeline())
+    {
+        CommitViewports();
+    }
 }
 
 void DeviceContextVkImpl::CommitScissorRects()
@@ -3429,9 +3434,11 @@ void DeviceContextVkImpl::BuildBLAS(const BuildBLASAttribs& Attribs)
             auto* const pVB = ClassPtrCast<BufferVkImpl>(SrcTris.pVertexBuffer);
 
             // vertex format in SrcTris may be undefined, so use vertex format from description
-            vkTris.vertexFormat             = TypeToVkFormat(TriDesc.VertexValueType, TriDesc.VertexComponentCount, TriDesc.VertexValueType < VT_FLOAT16);
-            vkTris.vertexStride             = SrcTris.VertexStride;
-            vkTris.maxVertex                = SrcTris.VertexCount;
+            vkTris.vertexFormat = TypeToVkFormat(TriDesc.VertexValueType, TriDesc.VertexComponentCount, TriDesc.VertexValueType < VT_FLOAT16);
+            vkTris.vertexStride = SrcTris.VertexStride;
+            // maxVertex is the number of vertices in vertexData minus one.
+            VERIFY(SrcTris.VertexCount > 0, "Vertex count must be greater than 0");
+            vkTris.maxVertex                = SrcTris.VertexCount - 1;
             vkTris.vertexData.deviceAddress = pVB->GetVkDeviceAddress() + SrcTris.VertexOffset;
 
             // geometry.triangles.vertexData.deviceAddress must be aligned to the size in bytes of the smallest component of the format in vertexFormat

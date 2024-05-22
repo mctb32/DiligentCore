@@ -83,7 +83,6 @@ PRIVATE
     ../GraphicsEngine/include
     ../GraphicsEngineD3DBase/include
     ../GraphicsEngineNextGenBase/include
-    ../ShaderTools/include
 )
 
 target_compile_definitions(Diligent-Archiver-static
@@ -105,6 +104,7 @@ PRIVATE
     Diligent-PlatformInterface
     Diligent-Common
     Diligent-GraphicsAccessories
+    Diligent-ShaderTools
 )
 
 if(D3D11_SUPPORTED)
@@ -126,7 +126,12 @@ if(VULKAN_SUPPORTED)
 endif()
 
 if(GL_SUPPORTED OR GLES_SUPPORTED)
-    target_link_libraries(Diligent-Archiver-static PRIVATE Diligent-GraphicsEngineOpenGL-static)
+    target_link_libraries(Diligent-Archiver-static
+    PRIVATE
+        Diligent-GraphicsEngineOpenGL-static
+        spirv-cross-core
+        spirv-cross-glsl
+    )
     target_include_directories(Diligent-Archiver-static PRIVATE ../GraphicsEngineOpenGL/include)
 
     if(PLATFORM_WIN32)

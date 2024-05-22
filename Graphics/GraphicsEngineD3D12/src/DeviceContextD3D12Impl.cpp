@@ -951,7 +951,7 @@ void DeviceContextD3D12Impl::ClearDepthStencil(ITextureView*                  pV
     ++m_State.NumCommands;
 }
 
-void DeviceContextD3D12Impl::ClearRenderTarget(ITextureView* pView, const float* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
+void DeviceContextD3D12Impl::ClearRenderTarget(ITextureView* pView, const void* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
 {
     DEV_CHECK_ERR(m_pActiveRenderPass == nullptr, "Direct3D12 does not allow render target clears inside a render pass");
 
@@ -963,13 +963,25 @@ void DeviceContextD3D12Impl::ClearRenderTarget(ITextureView* pView, const float*
     if (RGBA == nullptr)
         RGBA = Zero;
 
+#ifdef DILIGENT_DEVELOPMENT
+    {
+        const TEXTURE_FORMAT        RTVFormat  = pViewD3D12->GetDesc().Format;
+        const TextureFormatAttribs& FmtAttribs = GetTextureFormatAttribs(RTVFormat);
+        if (FmtAttribs.ComponentType == COMPONENT_TYPE_SINT ||
+            FmtAttribs.ComponentType == COMPONENT_TYPE_UINT)
+        {
+            DEV_CHECK_ERR(memcmp(RGBA, Zero, 4 * sizeof(float)) == 0, "Integer render targets can at the moment only be cleared to zero in Direct3D12");
+        }
+    }
+#endif
+
     auto* pTextureD3D12 = ClassPtrCast<TextureD3D12Impl>(pViewD3D12->GetTexture());
     auto& CmdCtx        = GetCmdContext();
     TransitionOrVerifyTextureState(CmdCtx, *pTextureD3D12, StateTransitionMode, RESOURCE_STATE_RENDER_TARGET, "Clearing render target (DeviceContextD3D12Impl::ClearRenderTarget)");
 
     // The full extent of the resource view is always cleared.
     // Viewport and scissor settings are not applied??
-    CmdCtx.AsGraphicsContext().ClearRenderTarget(pViewD3D12->GetCPUDescriptorHandle(), RGBA);
+    CmdCtx.AsGraphicsContext().ClearRenderTarget(pViewD3D12->GetCPUDescriptorHandle(), static_cast<const float*>(RGBA));
     ++m_State.NumCommands;
 }
 

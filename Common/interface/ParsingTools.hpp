@@ -32,6 +32,8 @@
 #include <cstring>
 #include <sstream>
 #include <limits>
+#include <vector>
+#include <algorithm>
 
 #include "../../Primitives/interface/BasicTypes.h"
 #include "../../Primitives/interface/FlagEnum.h"
@@ -1223,6 +1225,91 @@ inline int GetArrayIndex(const InteratorType& Start, const InteratorType& End, s
 inline int GetArrayIndex(const std::string& Var, std::string& NameWithoutBrackets)
 {
     return GetArrayIndex(Var.begin(), Var.end(), NameWithoutBrackets);
+}
+
+
+/// Finds the next preprocessor directive in the given range.
+///
+/// # define MACRO
+/// ^ ^     ^
+/// | |    NameEnd
+/// | NameStart
+/// Return value
+template <typename InteratorType>
+inline InteratorType FindNextPreprocessorDirective(const InteratorType& Start, const InteratorType& End, InteratorType& NameStart, InteratorType& NameEnd)
+{
+    NameStart = End;
+    NameEnd   = End;
+
+    auto Pos = Start;
+    while (Pos != End)
+    {
+        // // Comment
+        // ^
+        Pos = SkipDelimitersAndComments(Pos, End);
+        if (Pos == End)
+            break;
+
+        if (*Pos == '#')
+        {
+            // #  define MACRO
+            // ^
+            // Pos
+
+            NameStart = SkipDelimiters(Pos + 1, End, " \t");
+            // # define MACRO
+            //   ^
+            // NameStart
+
+            NameEnd = SkipIdentifier(NameStart, End);
+            // # define MACRO
+            //         ^
+            //		 NameEnd
+
+            break;
+        }
+        else
+        {
+            Pos = SkipLine(Pos, End, /* GoToNextLine = */ true);
+        }
+    }
+
+    return Pos;
+}
+
+/// Strips all preprocessor directives from the source string.
+inline void StripPreprocessorDirectives(std::string& Source, const std::vector<std::string>& Directives)
+{
+    if (Directives.empty())
+        return;
+
+    auto Pos = Source.begin();
+    while (Pos != Source.end())
+    {
+        std::string::iterator NameStart, NameEnd;
+        Pos = FindNextPreprocessorDirective(Pos, Source.end(), NameStart, NameEnd);
+        if (Pos == Source.end())
+            break;
+
+        // # version 450
+        // ^ ^      ^
+        // | |      NameEnd
+        // | NameStart
+        // Pos
+
+        const std::string DirectiveIdentifier{NameStart, NameEnd};
+        if (!DirectiveIdentifier.empty() && std::find(Directives.begin(), Directives.end(), DirectiveIdentifier) != Directives.end())
+        {
+            // Keep the newline character
+            const auto LineEnd = SkipLine(NameEnd, Source.end(), /* GoToNextLine = */ false);
+
+            Pos = Source.erase(Pos, LineEnd);
+            if (Pos == Source.end())
+                break;
+        }
+
+        Pos = SkipLine(Pos, Source.end(), /* GoToNextLine = */ true);
+    }
 }
 
 } // namespace Parsing

@@ -904,7 +904,7 @@ void DeviceContextD3D11Impl::ClearDepthStencil(ITextureView*                  pV
     m_pd3d11DeviceContext->ClearDepthStencilView(pd3d11DSV, d3d11ClearFlags, fDepth, Stencil);
 }
 
-void DeviceContextD3D11Impl::ClearRenderTarget(ITextureView* pView, const float* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
+void DeviceContextD3D11Impl::ClearRenderTarget(ITextureView* pView, const void* RGBA, RESOURCE_STATE_TRANSITION_MODE StateTransitionMode)
 {
     TDeviceContextBase::ClearRenderTarget(pView);
 
@@ -917,9 +917,21 @@ void DeviceContextD3D11Impl::ClearRenderTarget(ITextureView* pView, const float*
     if (RGBA == nullptr)
         RGBA = Zero;
 
+#ifdef DILIGENT_DEVELOPMENT
+    {
+        const TEXTURE_FORMAT        RTVFormat  = pViewD3D11->GetDesc().Format;
+        const TextureFormatAttribs& FmtAttribs = GetTextureFormatAttribs(RTVFormat);
+        if (FmtAttribs.ComponentType == COMPONENT_TYPE_SINT ||
+            FmtAttribs.ComponentType == COMPONENT_TYPE_UINT)
+        {
+            DEV_CHECK_ERR(memcmp(RGBA, Zero, 4 * sizeof(float)) == 0, "Integer render targets can at the moment only be cleared to zero in Direct3D12");
+        }
+    }
+#endif
+
     // The full extent of the resource view is always cleared.
     // Viewport and scissor settings are not applied.
-    m_pd3d11DeviceContext->ClearRenderTargetView(pd3d11RTV, RGBA);
+    m_pd3d11DeviceContext->ClearRenderTargetView(pd3d11RTV, static_cast<const float*>(RGBA));
 }
 
 void DeviceContextD3D11Impl::Flush()
